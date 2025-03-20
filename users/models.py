@@ -1,7 +1,8 @@
-from django.utils import timezone
-from django.db import models
 from django.contrib.auth.models import AbstractUser
+from django.db import models
+from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
+
 
 class User(AbstractUser):
     """
@@ -12,7 +13,7 @@ class User(AbstractUser):
         ('project_owner', 'Porteur de projet'),
         ('admin', 'Administrateur'),
     )
-    
+    email = models.EmailField(_('email address'), unique=True)
     user_type = models.CharField(max_length=20, choices=USER_TYPE_CHOICES)
     email_verified = models.BooleanField(default=False)
     profile_picture = models.ImageField(upload_to='profile_pictures/', null=True, blank=True)
@@ -23,6 +24,9 @@ class User(AbstractUser):
     # Champs pour l'authentification sociale
     google_id = models.CharField(max_length=100, blank=True, null=True)
     linkedin_id = models.CharField(max_length=100, blank=True, null=True)
+    
+    USERNAME_FIELD = 'email'
+    REQUIRED_FIELDS = ['username']
     
     class Meta:
         verbose_name = _('user')
