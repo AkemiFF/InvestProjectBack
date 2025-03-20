@@ -4,6 +4,7 @@ from django.contrib.auth import get_user_model, authenticate
 from django.utils.translation import gettext_lazy as _
 from django.contrib.auth.password_validation import validate_password
 from .models import InvestorProfile, ProjectOwnerProfile, Favorite
+from django.contrib.auth.validators import UnicodeUsernameValidator
 
 User = get_user_model()
 
@@ -136,3 +137,20 @@ class FavoriteSerializer(serializers.ModelSerializer):
 class SocialAuthSerializer(serializers.Serializer):
     provider = serializers.CharField(required=True)
     access_token = serializers.CharField(required=True)
+
+
+
+class InitiateRegistrationSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+
+class CompleteRegistrationSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+    code = serializers.CharField(max_length=6)
+    username = serializers.CharField(
+        max_length=150,
+        validators=[UnicodeUsernameValidator()]
+    )
+    password = serializers.CharField(
+        write_only=True,
+        style={'input_type': 'password'}
+    )

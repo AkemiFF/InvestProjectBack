@@ -1,4 +1,9 @@
 # users/views.py
+import secrets
+import string
+from django.utils import timezone
+from django.db import IntegrityError
+from django.conf import settings
 from rest_framework import viewsets, permissions, status, generics
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -6,41 +11,103 @@ from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import get_user_model
 from django.shortcuts import get_object_or_404
-from .models import InvestorProfile, ProjectOwnerProfile, Favorite
-from .serializers import (
-    UserRegistrationSerializer, UserLoginSerializer, UserProfileSerializer,
-    ChangePasswordSerializer, ResetPasswordRequestSerializer, ResetPasswordConfirmSerializer,
-    EmailVerificationSerializer, InvestorProfileSerializer, ProjectOwnerProfileSerializer,
-    FavoriteSerializer, SocialAuthSerializer
-)
+from .models import InvestorProfile, ProjectOwnerProfile, Favorite, RegistrationRequest
+from .serializers import *
+from django.core.mail import send_mail
+from rest_framework.decorators import action, api_view, permission_classes
 from .permissions import IsOwnerOrAdmin
 from .utils import send_verification_email, send_password_reset_email, verify_token
 
 User = get_user_model()
 
-class UserRegistrationView(generics.CreateAPIView):
-    """
-    API endpoint pour l'inscription des utilisateurs
-    """
-    serializer_class = UserRegistrationSerializer
-    permission_classes = [permissions.AllowAny]
+@api_view(['POST'])
+@permission_classes([permissions.AllowAny])
+def initiate_registration(request):
+    # print("Corps de la requête reçu :", request.data)  # Décode le corps brut en chaîne de caractères
+    serializer = InitiateRegistrationSerializer(data=request.data)
+    if not serializer.is_valid():
+        return Response(serializer.errors, status=400)
+
+    email = User.objects.normalize_email(serializer.validated_data['email'])
     
-    def post(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        user = serializer.save()
+    # Vérifier si l'email existe déjà
+    if User.objects.filter(email=email).exists():
+        return Response({"error": "Email déjà enregistré"}, status=400)
+    
+    # Générer un code de 6 chiffres
+    code = ''.join(secrets.choice(string.digits) for _ in range(6))
+    
+    # Créer ou mettre à jour la demande d'inscription
+    RegistrationRequest.objects.update_or_create(
+        email=email,
+        defaults={'code': code, 'created_at': timezone.now()}
+    )
+    
+    # Envoyer le code par email (à remplacer par une tâche asynchrone en production)
+    send_mail(
+        'Votre code de vérification NexusInvest',
+        f'Votre code de vérification est : {code}',
+        settings.DEFAULT_FROM_EMAIL,
+        [email],
+        fail_silently=False,
+    )
+    
+    return Response({"message": "Code de vérification envoyé par email"})
+
+@api_view(['POST'])
+@permission_classes([permissions.AllowAny])
+def complete_registration(request):
+    serializer = CompleteRegistrationSerializer(data=request.data)
+    if not serializer.is_valid():
+        return Response(serializer.errors, status=400)
+    
+    email = User.objects.normalize_email(serializer.validated_data['email'])
+    code = serializer.validated_data['code']
+    username = serializer.validated_data['username']
+    password = serializer.validated_data['password']
+    
+    # Récupérer la demande d'inscription
+    try:
+        registration_request = RegistrationRequest.objects.filter(email=email).latest('created_at')
+    except RegistrationRequest.DoesNotExist:
+        print("Aucune demande d'inscription trouvée pour l'email:", email)
+        return Response({"error": "Aucune demande d'inscription trouvée"}, status=400)
+    
+    # Vérifier le code et l'expiration
+    if registration_request.code != code:
+        print("Code invalide pour l'email:", email)
+        return Response({"error": "Code invalide"}, status=400)
+    
+    if registration_request.is_expired():
         
-        # Envoyer l'email de vérification
-        send_verification_email(user)
-        
-        # Générer les tokens JWT
-        refresh = RefreshToken.for_user(user)
-        
-        return Response({
-            'refresh': str(refresh),
-            'access': str(refresh.access_token),
-            'user': UserProfileSerializer(user).data
-        }, status=status.HTTP_201_CREATED)
+        print("Code expiré pour l'email:", email)
+        return Response({"error": "Code expiré"}, status=400)
+    
+    # Vérifier le nom d'utilisateur
+    if User.objects.filter(username=username).exists():
+        print("Nom d'utilisateur déjà pris:", username)
+        return Response({"error": "Nom d'utilisateur déjà pris"}, status=505)
+    
+    # Créer l'utilisateur
+    try:
+        user = User.objects.create_user(
+            email=email,
+            username=username,
+            password=password,
+            is_verified=True
+        )
+    except IntegrityError:
+        return Response({"error": "Erreur lors de la création du compte"}, status=400)
+    
+    # Supprimer la demande d'inscription
+    registration_request.delete()
+    
+    return Response({
+        "message": "Compte créé avec succès",
+        "user_id": user.id,
+        "email": user.email,
+        "username": user.username
+    })
 
 class UserLoginView(APIView):
     """
