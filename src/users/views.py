@@ -17,6 +17,8 @@ from django.core.mail import send_mail
 from rest_framework.decorators import action, api_view, permission_classes
 from .permissions import IsOwnerOrAdmin
 from .utils import send_verification_email, send_password_reset_email, verify_token
+from rest_framework_simplejwt.views import (TokenObtainPairView,
+                                            TokenRefreshView)
 
 User = get_user_model()
 
@@ -389,3 +391,30 @@ class SocialAuthView(APIView):
             {"detail": "L'authentification sociale n'est pas encore implémentée."},
             status=status.HTTP_501_NOT_IMPLEMENTED
         )
+    
+class CustomTokenObtainPairView(TokenObtainPairView):
+    """
+    Custom token view that adds additional information to the response.
+    """
+    def post(self, request, *args, **kwargs):
+        response = super().post(request, *args, **kwargs)
+        
+        if response.status_code == status.HTTP_200_OK:
+            # Add user info to response
+            email = request.data.get('email')
+            password = request.data.get('password')
+            user = authenticate(email=email, password=password)
+            if user is None:
+                return Response({"detail": "Invalid credentials"}, status=status.HTTP_401_UNAUTHORIZED)
+            response.data['user_id'] = user.id
+            response.data['username'] = user.username
+            response.data['email'] = user.email
+            response.data['role'] = user.role
+            
+            # Add token expiration info
+            response.data['token_lifetime'] = {
+                'access': f"{settings.SIMPLE_JWT['ACCESS_TOKEN_LIFETIME'].total_seconds()} seconds",
+                'refresh': f"{settings.SIMPLE_JWT['REFRESH_TOKEN_LIFETIME'].total_seconds()} seconds",
+            }
+        
+        return response
