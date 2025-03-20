@@ -46,7 +46,7 @@ INSTALLED_APPS = [
     'subscriptions',
     'payments',
     'admin_dashboard',
-    'users',
+    'user',
     # Ton app d'authentification
     
 ]
