@@ -449,9 +449,8 @@ class CustomTokenObtainPairView(TokenObtainPairView):
             response.data['username'] = user.username
             response.data['email'] = user.email
             response.data['role'] = user.user_type
-            response.data['pic'] = user.profile_picture
+            response.data['pic'] = user.profile_picture if user.profile_picture else ""
             
-            # Add token expiration info
             response.data['token_lifetime'] = {
                 'access': settings.SIMPLE_JWT['ACCESS_TOKEN_LIFETIME'].total_seconds(),
                 'refresh':settings.SIMPLE_JWT['REFRESH_TOKEN_LIFETIME'].total_seconds()
