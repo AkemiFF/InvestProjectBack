@@ -1,30 +1,36 @@
 # users/views.py
 import secrets
 import string
-from django.utils import timezone
-from django.db import IntegrityError
+
 from django.conf import settings
-from rest_framework import viewsets, permissions, status, generics
-from rest_framework.decorators import action
+from django.contrib.auth import get_user_model
+from django.core.mail import send_mail
+# views.py ou un service d'email de vérification
+from django.core.signing import BadSignature, SignatureExpired, TimestampSigner
+from django.db import IntegrityError
+from django.http import JsonResponse
+from django.shortcuts import get_object_or_404
+from django.utils import timezone
+from rest_framework import generics, permissions, status, viewsets
+from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
-from django.contrib.auth import get_user_model
-from django.shortcuts import get_object_or_404
-from .models import InvestorProfile, ProjectOwnerProfile, Favorite, RegistrationRequest
-from .serializers import *
-from django.core.mail import send_mail
-from rest_framework.decorators import action, api_view, permission_classes
-from .permissions import IsOwnerOrAdmin
-from .utils import send_verification_email, send_password_reset_email, verify_token
 from rest_framework_simplejwt.views import (TokenObtainPairView,
                                             TokenRefreshView)
+
+from .models import (Favorite, InvestorProfile, ProjectOwnerProfile,
+                     RegistrationRequest)
+from .permissions import IsOwnerOrAdmin
+from .serializers import *
+from .utils import (send_password_reset_email, send_verification_email,
+                    verify_token)
 
 User = get_user_model()
 
 @api_view(['POST'])
 @permission_classes([permissions.AllowAny])
-def initiate_registration(request):
+def initiate_registration2(request):
     # print("Corps de la requête reçu :", request.data)  # Décode le corps brut en chaîne de caractères
     serializer = InitiateRegistrationSerializer(data=request.data)
     if not serializer.is_valid():
@@ -56,60 +62,93 @@ def initiate_registration(request):
     
     return Response({"message": "Code de vérification envoyé par email"})
 
+
+def send_link_email(user):
+    """
+    Fonction pour envoyer un email de vérification à l'utilisateur
+    """
+    signer = TimestampSigner()
+    token = signer.sign(user.id)
+    
+    frontend_url = settings.NEXT_PUBLIC_FRONTEND_URL
+    verification_link = f"{frontend_url}/auth/verify-token?token={token}"
+    
+    subject = "Vérification de votre adresse email"
+    message = (
+        "Bonjour,\n\n"
+        "Nous avons envoyé un lien de vérification à votre adresse email.\n"
+        "Veuillez cliquer sur le lien suivant pour vérifier votre compte :\n"
+        f"{verification_link}\n\n"
+        "Si vous n'avez pas créé de compte, ignorez cet email.\n"
+    )
+    
+    send_mail(
+        subject,
+        message,
+        settings.DEFAULT_FROM_EMAIL,
+        [user.email],
+        fail_silently=False,
+    )
+
 @api_view(['POST'])
 @permission_classes([permissions.AllowAny])
-def complete_registration(request):
+def initiate_registration(request):
+    
     serializer = CompleteRegistrationSerializer(data=request.data)
     if not serializer.is_valid():
         return Response(serializer.errors, status=400)
     
     email = User.objects.normalize_email(serializer.validated_data['email'])
-    code = serializer.validated_data['code']
-    username = serializer.validated_data['username']
+    name = serializer.validated_data['name']
     password = serializer.validated_data['password']
+    user_type = serializer.validated_data['userType']
     
-    # Récupérer la demande d'inscription
-    try:
-        registration_request = RegistrationRequest.objects.filter(email=email).latest('created_at')
-    except RegistrationRequest.DoesNotExist:
-        print("Aucune demande d'inscription trouvée pour l'email:", email)
-        return Response({"error": "Aucune demande d'inscription trouvée"}, status=400)
-    
-    # Vérifier le code et l'expiration
-    if registration_request.code != code:
-        print("Code invalide pour l'email:", email)
-        return Response({"error": "Code invalide"}, status=400)
-    
-    if registration_request.is_expired():
-        
-        print("Code expiré pour l'email:", email)
-        return Response({"error": "Code expiré"}, status=400)
-    
-    # Vérifier le nom d'utilisateur
-    if User.objects.filter(username=username).exists():
-        print("Nom d'utilisateur déjà pris:", username)
-        return Response({"error": "Nom d'utilisateur déjà pris"}, status=505)
-    
+    # Vérifier si le nom d'utilisateur est déjà pris
+    if User.objects.filter(username=name).exists():
+        return Response({"error": "Nom d'utilisateur déjà pris"}, status=406)
+    # Remplacer les espaces par des underscores dans le nom d'utilisateur
+    name = name.replace(" ", "_")
     # Créer l'utilisateur
     try:
         user = User.objects.create_user(
             email=email,
-            username=username,
+            username=name,
             password=password,
-            is_verified=True
+            user_type=user_type,
+            is_active=False  # Désactivé jusqu'à la vérification par email
         )
+        send_link_email(user)  # Envoyer l'email de confirmation
     except IntegrityError:
         return Response({"error": "Erreur lors de la création du compte"}, status=400)
-    
-    # Supprimer la demande d'inscription
-    registration_request.delete()
-    
+
     return Response({
         "message": "Compte créé avec succès",
         "user_id": user.id,
         "email": user.email,
         "username": user.username
-    })
+    }, status=201)
+
+
+@api_view(['POST'])
+@permission_classes([permissions.AllowAny])
+def complete_registration(request):
+    token = request.data.get("token")
+    signer = TimestampSigner()
+    try:
+        user_id = signer.unsign(token, max_age=3600) 
+    except SignatureExpired:
+        return JsonResponse({"detail": "Token expiré"}, status=401)
+    except BadSignature:
+        return JsonResponse({"detail": "Token invalide"}, status=401)
+
+    try:
+        user = User.objects.get(id=user_id)
+    except User.DoesNotExist:
+        return JsonResponse({"detail": "Utilisateur introuvable"}, status=404)
+    
+    user.is_active = True
+    user.save()
+    return JsonResponse({"detail": "Email vérifié avec succès"}, status=200)
 
 class UserLoginView(APIView):
     """
@@ -409,12 +448,41 @@ class CustomTokenObtainPairView(TokenObtainPairView):
             response.data['user_id'] = user.id
             response.data['username'] = user.username
             response.data['email'] = user.email
-            response.data['role'] = user.role
+            response.data['role'] = user.user_type
+            response.data['pic'] = user.profile_picture if user.profile_picture else ""
             
-            # Add token expiration info
             response.data['token_lifetime'] = {
-                'access': f"{settings.SIMPLE_JWT['ACCESS_TOKEN_LIFETIME'].total_seconds()} seconds",
-                'refresh': f"{settings.SIMPLE_JWT['REFRESH_TOKEN_LIFETIME'].total_seconds()} seconds",
+                'access': settings.SIMPLE_JWT['ACCESS_TOKEN_LIFETIME'].total_seconds(),
+                'refresh':settings.SIMPLE_JWT['REFRESH_TOKEN_LIFETIME'].total_seconds()
+            }
+        
+        return response
+    
+class CustomRefresh(TokenRefreshView):
+    """
+    Custom refresh view that returns additional user information and token lifetime details,
+    similar to CustomTokenObtainPairView.
+    """
+    def post(self, request, *args, **kwargs):
+        response = super().post(request, *args, **kwargs)
+        
+        if response.status_code == status.HTTP_200_OK:
+            refresh_token = request.data.get("refresh")
+            try:
+                token = RefreshToken(refresh_token)
+                user_id = token.get("user_id")
+                User = get_user_model()
+                user = User.objects.get(id=user_id)
+            except Exception as e:
+                return Response({"detail": "Invalid refresh token"}, status=status.HTTP_401_UNAUTHORIZED)
+            
+            response.data['user_id'] = user.id
+            response.data['username'] = user.username
+            response.data['email'] = user.email
+            response.data['role'] = getattr(user, "user_type", None)
+            response.data['token_lifetime'] = {
+                'access': settings.SIMPLE_JWT['ACCESS_TOKEN_LIFETIME'].total_seconds(),
+                'refresh': settings.SIMPLE_JWT['REFRESH_TOKEN_LIFETIME'].total_seconds(),
             }
         
         return response

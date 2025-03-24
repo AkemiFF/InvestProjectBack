@@ -1,10 +1,11 @@
 # users/serializers.py
-from rest_framework import serializers
-from django.contrib.auth import get_user_model, authenticate
-from django.utils.translation import gettext_lazy as _
+from django.contrib.auth import authenticate, get_user_model
 from django.contrib.auth.password_validation import validate_password
-from .models import InvestorProfile, ProjectOwnerProfile, Favorite
 from django.contrib.auth.validators import UnicodeUsernameValidator
+from django.utils.translation import gettext_lazy as _
+from rest_framework import serializers
+
+from .models import Favorite, InvestorProfile, ProjectOwnerProfile
 
 User = get_user_model()
 
@@ -145,11 +146,9 @@ class InitiateRegistrationSerializer(serializers.Serializer):
 
 class CompleteRegistrationSerializer(serializers.Serializer):
     email = serializers.EmailField()
-    code = serializers.CharField(max_length=6)
-    username = serializers.CharField(
-        max_length=150,
-        validators=[UnicodeUsernameValidator()]
-    )
+    userType = serializers.CharField(max_length=50)
+    name = serializers.CharField(
+        max_length=150    )
     password = serializers.CharField(
         write_only=True,
         style={'input_type': 'password'}
