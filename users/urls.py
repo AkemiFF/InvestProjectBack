@@ -1,6 +1,7 @@
 # users/urls.py
-from django.urls import path, include
+from django.urls import include, path
 from rest_framework.routers import DefaultRouter
+
 from .views import *
 
 router = DefaultRouter()
@@ -11,6 +12,7 @@ router.register(r'project-owner-profiles', ProjectOwnerProfileViewSet)
 urlpatterns = [
     path('', include(router.urls)),
     path('auth/login/', CustomTokenObtainPairView.as_view(), name='login'),
+    path('auth/token/refresh/', CustomRefresh.as_view(), name='refresh'),
     path('auth/verify-email/', EmailVerificationView.as_view(), name='verify-email'),
     path('auth/reset-password-request/', ResetPasswordRequestView.as_view(), name='reset-password-request'),
     path('auth/reset-password-confirm/', ResetPasswordConfirmView.as_view(), name='reset-password-confirm'),
