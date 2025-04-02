@@ -16,9 +16,15 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import include, path
+from projects.views import SectorViewSet
+from rest_framework.routers import DefaultRouter
+
+router = DefaultRouter()
+router.register(r'api/sectors', SectorViewSet)
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    path('', include(router.urls)),
     path('api/', include('users.urls')),
     path('api/projects/', include('projects.urls')),
     path('api/comments/', include('comments.urls')),
