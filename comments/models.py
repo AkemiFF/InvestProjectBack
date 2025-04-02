@@ -1,6 +1,7 @@
 from django.db import models
-from users.models import User
 from projects.models import Project
+from users.models import User
+
 
 class Comment(models.Model):
     """
@@ -13,6 +14,8 @@ class Comment(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     is_approved = models.BooleanField(default=True)
+    is_moderated = models.BooleanField(default=False)
+    is_reported = models.BooleanField(default=False)
     
     class Meta:
         ordering = ['-created_at']
