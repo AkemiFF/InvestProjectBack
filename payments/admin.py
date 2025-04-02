@@ -1,7 +1,7 @@
 from django.contrib import admin
 
 # Register your models here.
-from .models import Payment, PaymentMedia
+from .models import *
 
-admin.site.register(Payment)
-admin.site.register(PaymentMedia)
+admin.site.register(PaymentMethod)
+admin.site.register(Invoice)
