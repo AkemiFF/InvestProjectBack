@@ -1,5 +1,7 @@
 # projects/serializers.py
 from rest_framework import serializers
+
+from users.models import Favorite
 from .models import Project, ProjectMedia, Sector
 from users.serializers import UserProfileSerializer
 
@@ -83,7 +85,7 @@ class ProjectDetailSerializer(serializers.ModelSerializer):
     def get_is_favorite(self, obj):
         request = self.context.get('request')
         if request and request.user.is_authenticated:
-            return request.user.favorite_projects.filter(id=obj.id).exists()
+            return Favorite.objects.filter(user=request.user, project=obj).exists()
         return False
 
 class ProjectCreateUpdateSerializer(serializers.ModelSerializer):
