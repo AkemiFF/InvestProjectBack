@@ -45,7 +45,6 @@ class Project(models.Model):
     use_of_funds = models.TextField(null=True, blank=True)
     financial_projections = models.TextField(null=True, blank=True)
     risks = models.TextField(null=True, blank=True)
-    team = models.TextField(null=True, blank=True)
     milestones = models.TextField(null=True, blank=True)
     equity = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
     maximum_investment = models.DecimalField(max_digits=15, decimal_places=2, null=True, blank=True)
@@ -83,6 +82,20 @@ class Project(models.Model):
         if self.amount_needed > 0:
             return (self.amount_raised / self.amount_needed) * 100
         return 0
+
+class TeamMember(models.Model):
+        """
+        Membres de l'équipe du projet
+        """
+        project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='team_members')
+        name = models.CharField(max_length=100)
+        role = models.CharField(max_length=100)
+        photo = models.ImageField(upload_to='team_photos/', blank=True, null=True)
+        facebook_url = models.URLField(blank=True, null=True)
+        
+        def __str__(self):
+            return f"{self.name} - {self.role}"
+
 
 class ProjectMedia(models.Model):
     """
