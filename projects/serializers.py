@@ -3,7 +3,7 @@ from rest_framework import serializers
 from users.models import Favorite
 from users.serializers import UserProfileSerializer
 
-from .models import Project, ProjectMedia, Sector
+from .models import Project, ProjectMedia, Sector, TeamMember
 
 
 class SectorSerializer(serializers.ModelSerializer):
@@ -23,6 +23,12 @@ class ProjectMediaSerializer(serializers.ModelSerializer):
         if obj.file and hasattr(obj.file, 'url') and request:
             return request.build_absolute_uri(obj.file.url)
         return None
+class ProjectTeamMemberSerializer(serializers.ModelSerializer):
+    
+    class Meta:
+        model = TeamMember
+        fields = ['id','name','role','photo','facebook_url']
+
 
 class ProjectListSerializer(serializers.ModelSerializer):
     sector = SectorSerializer(read_only=True)
@@ -57,6 +63,7 @@ class ProjectDetailSerializer(serializers.ModelSerializer):
     sector = SectorSerializer(read_only=True)
     owner = UserProfileSerializer(read_only=True)
     media = ProjectMediaSerializer(many=True, read_only=True)
+    team_members = ProjectTeamMemberSerializer(many=True, read_only=True)
     progress = serializers.SerializerMethodField()
     days_left = serializers.SerializerMethodField()
     is_favorite = serializers.SerializerMethodField()
@@ -64,11 +71,12 @@ class ProjectDetailSerializer(serializers.ModelSerializer):
     class Meta:
         model = Project
         fields = [
-            'id', 'title', 'slug', 'owner', 'description', 'sector', 
-            'funding_type', 'amount_needed', 'amount_raised', 'minimum_investment',
-            'status', 'created_at', 'updated_at', 'deadline', 'is_featured',
+            'id', 'title', 'slug', 'owner','short_description', 'description','business_model','market_analysis', 'sector', 
+            'funding_type', 'amount_needed', 'amount_raised', 'minimum_investment','maximum_investment','team_members',
+            'status', 'created_at', 'updated_at', 'deadline', 'is_featured','risks','use_of_funds',
             'is_boosted', 'views_count', 'interests_count', 'participants_count',
-            'video_url', 'media', 'progress', 'days_left', 'is_favorite'
+            'video_url', 'media', 'progress', 'days_left', 'is_favorite','financial_projections','competitive_advantage',
+            'equity', 'expected_return',
         ]
     
     def get_progress(self, obj):
