@@ -1,4 +1,6 @@
 # projects/views.py
+import json
+
 from django.db.models import F
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters, permissions, status, viewsets
@@ -42,7 +44,7 @@ class ProjectViewSet(viewsets.ModelViewSet):
     def create(self, request, *args, **kwargs):
         data = request.data
         data['owner'] = request.user.id  # Assigner l'utilisateur connecté comme propriétaire
-
+        print(data)
         # Sérialisation et validation des données du projet
         serializer = self.get_serializer(data=data)
         if not serializer.is_valid():
@@ -61,7 +63,26 @@ class ProjectViewSet(viewsets.ModelViewSet):
                 file_type='image', 
                 cover=True  
             )
-
+        # Gestion des membres de l'équipe
+        teams = data.get('team', [])
+        try:
+            teams = json.loads(data.get('team', '[]'))
+        except json.JSONDecodeError:
+            return Response(
+                {"detail": "Le format de l'équipe est invalide."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        print(teams)
+        for team in teams:
+            print(team)
+            TeamMember.objects.create(
+            project=project,
+            name=team.get('name'),
+            role=team.get('role'),
+            photo=team.get('photo'),
+            facebook_url=team.get('facebook_url')
+            )
+            
         images = request.FILES.getlist('images')
         for image in images:
             ProjectMedia.objects.create(
@@ -119,6 +140,7 @@ class ProjectViewSet(viewsets.ModelViewSet):
             import datetime
 
             from django.utils import timezone
+
             thirty_days_ago = timezone.now().date() - datetime.timedelta(days=30)
             queryset = queryset.filter(created_at__gte=thirty_days_ago)
         
