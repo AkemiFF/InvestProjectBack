@@ -4,8 +4,7 @@
 ### Django ###
 *.log
 *.pot
-*.pyc
-__pycache__/
+
 local_settings.py
 src/db.sqlite3
 db.sqlite3-journal
