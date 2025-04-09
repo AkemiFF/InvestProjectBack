@@ -20,6 +20,8 @@ class User(AbstractUser):
     biography = models.TextField(blank=True)
     phone_number = models.CharField(max_length=20, blank=True)
     two_factor_enabled = models.BooleanField(default=False)
+    currency = models.CharField(max_length=10, choices=[('Ariary', 'Ariary'), ('Euro', 'Euro'),('Dollars', 'Dollars')], default='Euro')
+    
     
     # Champs pour l'authentification sociale
     google_id = models.CharField(max_length=100, blank=True, null=True)
