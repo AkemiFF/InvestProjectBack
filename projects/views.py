@@ -197,3 +197,64 @@ class ProjectViewSet(viewsets.ModelViewSet):
         project.save(update_fields=['status'])
         
         return Response({"status": "Le projet a été soumis pour validation."})
+
+    @action(detail=True, methods=['post'])
+    def add_team_member(self, request, pk=None):
+        """
+        Ajouter un membre à l'équipe du projet
+        """
+        project = self.get_object()
+            
+        # Vérifier que l'utilisateur est le propriétaire du projet
+        if project.owner != request.user:
+            return Response(
+                {"detail": "Vous n'êtes pas autorisé à ajouter des membres à l'équipe de ce projet."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+            
+        serializer = ProjectTeamMemberSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save(project=project)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=True, methods=['delete'])
+    def remove_team_member(self, request, pk=None):
+        """
+        Supprimer un membre de l'équipe du projet
+        """
+        project = self.get_object()
+        
+        # Vérifier que l'utilisateur est le propriétaire du projet
+        if project.owner != request.user:
+            return Response(
+                {"detail": "Vous n'êtes pas autorisé à supprimer des membres de l'équipe de ce projet."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        member_id = request.data.get('member_id')
+        if not member_id:
+            return Response(
+                {"detail": "L'ID du membre est requis."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            team_member = project.team_members.get(id=member_id)
+            team_member.delete()
+            return Response({"detail": "Membre supprimé avec succès."}, status=status.HTTP_204_NO_CONTENT)
+        except TeamMember.DoesNotExist:
+            return Response(
+                {"detail": "Membre non trouvé."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+    @action(detail=True, methods=['get'])
+    def list_team_members(self, request, pk=None):
+        """
+        Lister les membres de l'équipe du projet
+        """
+        project = self.get_object()
+        team_members = project.team_members.all()
+        serializer = ProjectTeamMemberSerializer(team_members, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)

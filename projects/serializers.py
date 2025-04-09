@@ -1,7 +1,10 @@
 # projects/serializers.py
 from rest_framework import serializers
-from .models import Project, ProjectMedia, Sector
+from users.models import Favorite
 from users.serializers import UserProfileSerializer
+
+from .models import Project, ProjectMedia, Sector, TeamMember
+
 
 class SectorSerializer(serializers.ModelSerializer):
     class Meta:
@@ -13,13 +16,19 @@ class ProjectMediaSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = ProjectMedia
-        fields = ['id', 'file_url', 'file_type', 'title', 'uploaded_at']
+        fields = ['id', 'file_url', 'file_type', "cover",'title', 'uploaded_at']
     
     def get_file_url(self, obj):
         request = self.context.get('request')
         if obj.file and hasattr(obj.file, 'url') and request:
             return request.build_absolute_uri(obj.file.url)
         return None
+class ProjectTeamMemberSerializer(serializers.ModelSerializer):
+    
+    class Meta:
+        model = TeamMember
+        fields = ['id','name','role','photo','facebook_url']
+
 
 class ProjectListSerializer(serializers.ModelSerializer):
     sector = SectorSerializer(read_only=True)
@@ -40,8 +49,9 @@ class ProjectListSerializer(serializers.ModelSerializer):
         return obj.funding_percentage()
     
     def get_days_left(self, obj):
-        from django.utils import timezone
         import datetime
+
+        from django.utils import timezone
         
         if not obj.deadline:
             return 0
@@ -53,6 +63,7 @@ class ProjectDetailSerializer(serializers.ModelSerializer):
     sector = SectorSerializer(read_only=True)
     owner = UserProfileSerializer(read_only=True)
     media = ProjectMediaSerializer(many=True, read_only=True)
+    team_members = ProjectTeamMemberSerializer(many=True, read_only=True)
     progress = serializers.SerializerMethodField()
     days_left = serializers.SerializerMethodField()
     is_favorite = serializers.SerializerMethodField()
@@ -60,19 +71,21 @@ class ProjectDetailSerializer(serializers.ModelSerializer):
     class Meta:
         model = Project
         fields = [
-            'id', 'title', 'slug', 'owner', 'description', 'sector', 
-            'funding_type', 'amount_needed', 'amount_raised', 'minimum_investment',
-            'status', 'created_at', 'updated_at', 'deadline', 'is_featured',
+            'id', 'title', 'slug', 'owner','short_description', 'description','business_model','market_analysis', 'sector', 
+            'funding_type', 'amount_needed', 'amount_raised', 'minimum_investment','maximum_investment','team_members',
+            'status', 'created_at', 'updated_at', 'deadline', 'is_featured','risks','use_of_funds',
             'is_boosted', 'views_count', 'interests_count', 'participants_count',
-            'video_url', 'media', 'progress', 'days_left', 'is_favorite'
+            'video_url', 'media', 'progress', 'days_left', 'is_favorite','financial_projections','competitive_advantage',
+            'equity', 'expected_return',
         ]
     
     def get_progress(self, obj):
         return obj.funding_percentage()
     
     def get_days_left(self, obj):
-        from django.utils import timezone
         import datetime
+
+        from django.utils import timezone
         
         if not obj.deadline:
             return 0
@@ -83,7 +96,7 @@ class ProjectDetailSerializer(serializers.ModelSerializer):
     def get_is_favorite(self, obj):
         request = self.context.get('request')
         if request and request.user.is_authenticated:
-            return request.user.favorite_projects.filter(id=obj.id).exists()
+            return Favorite.objects.filter(user=request.user, project=obj).exists()
         return False
 
 class ProjectCreateUpdateSerializer(serializers.ModelSerializer):
