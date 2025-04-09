@@ -1,9 +1,10 @@
 # projects/serializers.py
 from rest_framework import serializers
-
 from users.models import Favorite
-from .models import Project, ProjectMedia, Sector
 from users.serializers import UserProfileSerializer
+
+from .models import Project, ProjectMedia, Sector
+
 
 class SectorSerializer(serializers.ModelSerializer):
     class Meta:
@@ -15,7 +16,7 @@ class ProjectMediaSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = ProjectMedia
-        fields = ['id', 'file_url', 'file_type', 'title', 'uploaded_at']
+        fields = ['id', 'file_url', 'file_type', "cover",'title', 'uploaded_at']
     
     def get_file_url(self, obj):
         request = self.context.get('request')
@@ -42,8 +43,9 @@ class ProjectListSerializer(serializers.ModelSerializer):
         return obj.funding_percentage()
     
     def get_days_left(self, obj):
-        from django.utils import timezone
         import datetime
+
+        from django.utils import timezone
         
         if not obj.deadline:
             return 0
@@ -73,8 +75,9 @@ class ProjectDetailSerializer(serializers.ModelSerializer):
         return obj.funding_percentage()
     
     def get_days_left(self, obj):
-        from django.utils import timezone
         import datetime
+
+        from django.utils import timezone
         
         if not obj.deadline:
             return 0
