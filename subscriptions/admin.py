@@ -1,6 +1,7 @@
 from django.contrib import admin
 
 # Register your models here.
-from .models import Subscription, SubscriptionMedia
+from .models import *
 admin.site.register(Subscription)
-admin.site.register(SubscriptionMedia)
+admin.site.register(SubscriptionPlan)
+admin.site.register(ProjectBoost)

@@ -5,6 +5,5 @@ from .models import *
 admin.site.register(AdminLog)
 admin.site.register(SystemSetting)
 admin.site.register(Statistic)
-admin.site.register(Statistic)
 
 
