@@ -2,6 +2,7 @@ from django.db import models
 from django.utils.text import slugify
 from users.models import User
 
+
 class Sector(models.Model):
     """
     Secteurs d'activité pour les projets
@@ -36,7 +37,23 @@ class Project(models.Model):
     title = models.CharField(max_length=200)
     slug = models.SlugField(max_length=250, unique=True, blank=True)
     owner = models.ForeignKey(User, on_delete=models.CASCADE, related_name='projects')
-    description = models.TextField()
+    short_description = models.TextField(default="")
+    description = models.TextField(default="")
+    business_model = models.TextField(null=True, blank=True)
+    market_analysis = models.TextField(null=True, blank=True)
+    competitive_advantage = models.TextField(null=True, blank=True)
+    use_of_funds = models.TextField(null=True, blank=True)
+    financial_projections = models.TextField(null=True, blank=True)
+    risks = models.TextField(null=True, blank=True)
+    team = models.TextField(null=True, blank=True)
+    milestones = models.TextField(null=True, blank=True)
+    equity = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
+    maximum_investment = models.DecimalField(max_digits=15, decimal_places=2, null=True, blank=True)
+    expected_return = models.DecimalField(max_digits=15, decimal_places=2, null=True, blank=True)
+    return_timeline = models.CharField(max_length=100, null=True, blank=True)
+    allow_partial_funding = models.BooleanField(default=True)
+    is_public = models.BooleanField(default=True)
+    location = models.CharField(max_length=255, null=True, blank=True)
     sector = models.ForeignKey(Sector, on_delete=models.SET_NULL, null=True, related_name='projects')
     funding_type = models.CharField(max_length=20, choices=FUNDING_TYPE_CHOICES)
     amount_needed = models.DecimalField(max_digits=15, decimal_places=2)
@@ -72,6 +89,7 @@ class ProjectMedia(models.Model):
     Images et documents associés à un projet
     """
     project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='media')
+    cover = models.BooleanField(default=False)
     file = models.FileField(upload_to='project_media/')
     file_type = models.CharField(max_length=10, choices=(
         ('image', 'Image'),
