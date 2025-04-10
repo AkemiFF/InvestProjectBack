@@ -72,7 +72,13 @@ class Project(models.Model):
     
     def save(self, *args, **kwargs):
         if not self.slug:
-            self.slug = slugify(self.title)
+            base_slug = slugify(self.title)
+            unique_slug = base_slug
+            num = 1
+            while Project.objects.filter(slug=unique_slug).exists():
+                unique_slug = f"{base_slug}-{num}"
+                num += 1
+            self.slug = unique_slug
         super().save(*args, **kwargs)
     
     def __str__(self):

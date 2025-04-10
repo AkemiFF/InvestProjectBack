@@ -20,6 +20,8 @@ class User(AbstractUser):
     biography = models.TextField(blank=True)
     phone_number = models.CharField(max_length=20, blank=True)
     two_factor_enabled = models.BooleanField(default=False)
+    currency = models.CharField(max_length=10, choices=[('Ariary', 'Ariary'), ('Euro', 'Euro'),('Dollars', 'Dollars')], default='Euro')
+    
     
     # Champs pour l'authentification sociale
     google_id = models.CharField(max_length=100, blank=True, null=True)
@@ -28,7 +30,14 @@ class User(AbstractUser):
     USERNAME_FIELD = 'email'
     REQUIRED_FIELDS = ['username']
     
+    def is_investor(self):
+            return self.user_type == 'investor'
+        
+    def is_project_owner(self):
+        return self.user_type == 'project_owner'
+    
     class Meta:
+        
         verbose_name = _('user')
         verbose_name_plural = _('users')
 

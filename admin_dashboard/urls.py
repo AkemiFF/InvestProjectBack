@@ -1,11 +1,11 @@
 # admin_dashboard/urls.py
-from django.urls import path, include
+from django.urls import include, path
 from rest_framework.routers import DefaultRouter
-from .views import (
-    AdminLogViewSet, SystemSettingViewSet, StatisticViewSet,
-    DashboardViewSet, UserManagementViewSet, ProjectManagementViewSet,
-    CommentModerationViewSet
-)
+
+from .views import (AdminLogViewSet, CommentModerationViewSet,
+                    DashboardViewSet, ProjectDeletionViewSet,
+                    ProjectManagementViewSet, StatisticViewSet,
+                    SystemSettingViewSet, UserManagementViewSet)
 
 router = DefaultRouter()
 router.register(r'logs', AdminLogViewSet)
@@ -18,4 +18,6 @@ router.register(r'comments', CommentModerationViewSet, basename='commentmoderati
 
 urlpatterns = [
     path('', include(router.urls)),
+    path('delete/project/<int:pk>/', ProjectDeletionViewSet.as_view({'delete': 'delete_project'}), name='delete-project'),
+    path('approuve/project/<int:pk>/', ProjectDeletionViewSet.as_view({'post': 'approuve_project'}), name='approuve-project'),
 ]

@@ -1,6 +1,7 @@
 # notifications/utils.py
 from .models import Notification
 
+
 def create_notification(recipient, notification_type, title, message, related_object_id=None, related_object_type=None):
     """
     Crée une nouvelle notification
@@ -79,7 +80,7 @@ def create_project_update_notification(investor, project_owner, project):
         related_object_type='project'
     )
 
-def create_system_notification(recipient, title, message):
+def create_system_notification(recipient, title, message,related_object):
     """
     Crée une notification système
     """
@@ -87,5 +88,6 @@ def create_system_notification(recipient, title, message):
         recipient=recipient,
         notification_type='system',
         title=title,
-        message=message
+        message=message,
+        related_object_type=related_object
     )

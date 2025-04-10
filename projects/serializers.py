@@ -38,12 +38,7 @@ class ProjectListSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = Project
-        fields = [
-            'id', 'title', 'slug', 'owner', 'sector', 'amount_needed', 
-            'amount_raised', 'status', 'created_at', 'deadline', 
-            'is_featured', 'progress', 'days_left', 'participants_count',
-            'interests_count'
-        ]
+        fields = '__all__'
     
     def get_progress(self, obj):
         return obj.funding_percentage()
@@ -99,6 +94,24 @@ class ProjectDetailSerializer(serializers.ModelSerializer):
             return Favorite.objects.filter(user=request.user, project=obj).exists()
         return False
 
+class ProjectCreateSerializer(serializers.ModelSerializer):
+    sector_id = serializers.IntegerField(write_only=True)
+    
+    class Meta:
+        model = Project
+        fields = "__all__"
+    
+    def create(self, validated_data):
+        sector_id = validated_data.pop('sector_id')
+        sector = Sector.objects.get(id=sector_id)
+        
+        user = self.context['request'].user
+        project = Project.objects.create(
+            # owner=user,
+            sector=sector,
+            **validated_data
+        )
+        return project
 class ProjectCreateUpdateSerializer(serializers.ModelSerializer):
     sector_id = serializers.IntegerField(write_only=True)
     
