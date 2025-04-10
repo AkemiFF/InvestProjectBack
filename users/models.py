@@ -30,7 +30,14 @@ class User(AbstractUser):
     USERNAME_FIELD = 'email'
     REQUIRED_FIELDS = ['username']
     
+    def is_investor(self):
+            return self.user_type == 'investor'
+        
+    def is_project_owner(self):
+        return self.user_type == 'project_owner'
+    
     class Meta:
+        
         verbose_name = _('user')
         verbose_name_plural = _('users')
 
