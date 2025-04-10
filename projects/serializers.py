@@ -69,7 +69,7 @@ class ProjectDetailSerializer(serializers.ModelSerializer):
             'id', 'title', 'slug', 'owner','short_description', 'description','business_model','market_analysis', 'sector', 
             'funding_type', 'amount_needed', 'amount_raised', 'minimum_investment','maximum_investment','team_members',
             'status', 'created_at', 'updated_at', 'deadline', 'is_featured','risks','use_of_funds',
-            'is_boosted', 'views_count', 'interests_count', 'participants_count',
+            'is_boosted', 'views_count', 'interests_count', 'participants_count', 'location','return_timeline',
             'video_url', 'media', 'progress', 'days_left', 'is_favorite','financial_projections','competitive_advantage',
             'equity', 'expected_return',
         ]
