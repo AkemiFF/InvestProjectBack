@@ -147,7 +147,7 @@ class ProjectManagementSerializer(serializers.Serializer):
     """
     project_id = serializers.IntegerField(required=True)
     action = serializers.ChoiceField(
-        choices=['approve', 'reject', 'feature', 'unfeature', 'hide', 'unhide'],
+        choices=['active', 'reject', 'feature', 'unfeature', 'hide', 'unhide'],
         required=True
     )
     reason = serializers.CharField(required=False, allow_blank=True)
@@ -181,8 +181,8 @@ class ProjectManagementSerializer(serializers.Serializer):
         project = Project.objects.get(id=project_id)
         admin_user = self.context['request'].user
         
-        if action == 'approve':
-            project.status = 'approved'
+        if action == 'active':
+            project.status = 'active'
             project.save(update_fields=['status'])
             description = f"Approbation du projet '{project.title}'"
             
@@ -190,7 +190,8 @@ class ProjectManagementSerializer(serializers.Serializer):
             create_system_notification(
                 recipient=project.owner,
                 title="Projet approuvé",
-                message=f"Votre projet '{project.title}' a été approuvé et est maintenant visible sur la plateforme."
+                message=f"Votre projet '{project.title}' a été approuvé et est maintenant visible sur la plateforme.",
+                related_object=project 
             )
         
         elif action == 'reject':
@@ -202,7 +203,8 @@ class ProjectManagementSerializer(serializers.Serializer):
             create_system_notification(
                 recipient=project.owner,
                 title="Projet rejeté",
-                message=f"Votre projet '{project.title}' a été rejeté. Raison: {reason or 'Non spécifiée'}"
+                message=f"Votre projet '{project.title}' a été rejeté. Raison: {reason or 'Non spécifiée'}",
+                related_object=project 
             )
         
         elif action == 'feature':
@@ -214,7 +216,8 @@ class ProjectManagementSerializer(serializers.Serializer):
             create_system_notification(
                 recipient=project.owner,
                 title="Projet mis en avant",
-                message=f"Votre projet '{project.title}' a été mis en avant sur la plateforme."
+                message=f"Votre projet '{project.title}' a été mis en avant sur la plateforme.",
+                related_object=project 
             )
         
         elif action == 'unfeature':
@@ -231,7 +234,8 @@ class ProjectManagementSerializer(serializers.Serializer):
             create_system_notification(
                 recipient=project.owner,
                 title="Projet masqué",
-                message=f"Votre projet '{project.title}' a été masqué. Raison: {reason or 'Non spécifiée'}"
+                message=f"Votre projet '{project.title}' a été masqué. Raison: {reason or 'Non spécifiée'}",
+                related_object=project 
             )
         
         elif action == 'unhide':
@@ -243,7 +247,8 @@ class ProjectManagementSerializer(serializers.Serializer):
             create_system_notification(
                 recipient=project.owner,
                 title="Projet visible",
-                message=f"Votre projet '{project.title}' est à nouveau visible sur la plateforme."
+                message=f"Votre projet '{project.title}' est à nouveau visible sur la plateforme.",
+                related_object=project 
             )
         
         # Ajouter la raison si elle est fournie
