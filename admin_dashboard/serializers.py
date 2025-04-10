@@ -1,9 +1,11 @@
 # admin_dashboard/serializers.py
-from rest_framework import serializers
-from .models import AdminLog, SystemSetting, Statistic
-from users.serializers import UserProfileSerializer
 from django.db import transaction
 from django.utils import timezone
+from rest_framework import serializers
+from users.serializers import UserProfileSerializer
+
+from .models import AdminLog, Statistic, SystemSetting
+
 
 class AdminLogSerializer(serializers.ModelSerializer):
     """
@@ -83,11 +85,13 @@ class UserManagementSerializer(serializers.Serializer):
         Exécute l'action sur l'utilisateur
         """
         from users.models import User
+
         from .utils import log_admin_action
         
         user_id = self.validated_data.get('user_id')
         action = self.validated_data.get('action')
         reason = self.validated_data.get('reason', '')
+        user_type = self.validated_data.get('user_type', '')
         
         user = User.objects.get(id=user_id)
         admin_user = self.context['request'].user
@@ -110,6 +114,11 @@ class UserManagementSerializer(serializers.Serializer):
         elif action == 'make_admin':
             user.is_staff = True
             user.save(update_fields=['is_staff'])
+            description = f"Attribution des droits d'administrateur à {user.username}"
+        
+        elif action == 'update_role':
+            user.is_staff = True
+            user.save(user_type=user_type)
             description = f"Attribution des droits d'administrateur à {user.username}"
         
         elif action == 'remove_admin':
@@ -160,8 +169,9 @@ class ProjectManagementSerializer(serializers.Serializer):
         """
         Exécute l'action sur le projet
         """
-        from projects.models import Project
         from notifications.utils import create_system_notification
+        from projects.models import Project
+
         from .utils import log_admin_action
         
         project_id = self.validated_data.get('project_id')
@@ -281,6 +291,7 @@ class CommentModerationSerializer(serializers.Serializer):
         """
         from comments.models import Comment
         from notifications.utils import create_system_notification
+
         from .utils import log_admin_action
         
         comment_id = self.validated_data.get('comment_id')
