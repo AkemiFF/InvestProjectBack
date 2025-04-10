@@ -1,6 +1,7 @@
 # admin_dashboard/views.py
 from django.db.models import Q
 from django.utils import timezone
+from projects.models import Project
 from rest_framework import filters, permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -468,3 +469,68 @@ class CommentModerationViewSet(viewsets.ViewSet):
         
         from comments.serializers import CommentSerializer
         return Response(CommentSerializer(comment).data)
+    
+class ProjectDeletionViewSet(viewsets.ViewSet):
+        """
+        API endpoint pour la suppression des projets
+        """
+        permission_classes = [permissions.IsAuthenticated, IsAdminUser]
+
+        @action(detail=True, methods=['delete'])
+        def delete_project(self, request, pk=None):
+            """
+            Supprime un projet par son ID
+            """
+
+            try:
+                project = Project.objects.get(pk=pk)
+                project.delete()
+
+                # Enregistrer l'action dans le journal
+                log_admin_action(
+                    admin_user=request.user,
+                    action_type='project_deletion',
+                    description=f"Suppression du projet '{project.title}' (ID: {pk})",
+                    related_object=project,
+                    ip_address=request.META.get('REMOTE_ADDR')
+                )
+
+                return Response(
+                    {"detail": "Projet supprimé avec succès."},
+                    status=status.HTTP_204_NO_CONTENT
+                )
+            except Project.DoesNotExist:
+                return Response(
+                    {"detail": "Projet non trouvé."},
+                    status=status.HTTP_404_NOT_FOUND
+                )
+                
+        @action(detail=True, methods=['post'])
+        def approuve_project(self, request, pk=None):
+            """
+            Supprime un projet par son ID
+            """
+
+            try:
+                project = Project.objects.get(pk=pk)
+                project.status = "active"
+                project.save()
+
+                # Enregistrer l'action dans le journal
+                log_admin_action(
+                    admin_user=request.user,
+                    action_type='approuve_project',
+                    description=f"approbation du projet '{project.title}' (ID: {pk})",
+                    related_object=project,
+                    ip_address=request.META.get('REMOTE_ADDR')
+                )
+
+                return Response(
+                    {"detail": "Projet approuvé avec succès."},
+                    status=status.HTTP_200_OK
+                )
+            except Project.DoesNotExist:
+                return Response(
+                    {"detail": "Projet non trouvé."},
+                    status=status.HTTP_404_NOT_FOUND
+                )
