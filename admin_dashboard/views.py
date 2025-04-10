@@ -1,20 +1,21 @@
 # admin_dashboard/views.py
-from rest_framework import viewsets, permissions, status, filters
-from rest_framework.decorators import action
-from rest_framework.response import Response
 from django.db.models import Q
 from django.utils import timezone
-from .models import AdminLog, SystemSetting, Statistic
-from .serializers import (
-    AdminLogSerializer, SystemSettingSerializer, StatisticSerializer,
-    DashboardMetricsSerializer, UserManagementSerializer,
-    ProjectManagementSerializer, CommentModerationSerializer
-)
+from rest_framework import filters, permissions, status, viewsets
+from rest_framework.decorators import action
+from rest_framework.response import Response
+from users.serializers import UserProfileSerializer
+
+from .models import AdminLog, Statistic, SystemSetting
 from .permissions import IsAdminUser
-from .utils import (
-    log_admin_action, get_dashboard_metrics, get_user_growth_data,
-    get_revenue_data, update_daily_statistics
-)
+from .serializers import (AdminLogSerializer, CommentModerationSerializer,
+                          DashboardMetricsSerializer,
+                          ProjectManagementSerializer, StatisticSerializer,
+                          SystemSettingSerializer, UserManagementSerializer)
+from .utils import (get_dashboard_metrics, get_revenue_data,
+                    get_user_growth_data, log_admin_action,
+                    update_daily_statistics)
+
 
 class AdminLogViewSet(viewsets.ReadOnlyModelViewSet):
     """
@@ -284,7 +285,7 @@ class UserManagementViewSet(viewsets.ViewSet):
         """
         from users.models import User
         from users.serializers import UserProfileSerializer
-        
+
         # Filtres
         status = request.query_params.get('status')
         role = request.query_params.get('role')
@@ -304,9 +305,9 @@ class UserManagementViewSet(viewsets.ViewSet):
         if role == 'admin':
             queryset = queryset.filter(is_staff=True)
         elif role == 'investor':
-            queryset = queryset.filter(is_investor=True)
+            queryset = queryset.filter(user_type='investor')
         elif role == 'project_owner':
-            queryset = queryset.filter(is_project_owner=True)
+            queryset = queryset.filter(user_type='project_owner')
         
         if search:
             queryset = queryset.filter(
@@ -340,11 +341,12 @@ class UserManagementViewSet(viewsets.ViewSet):
         """
         Gère un utilisateur (activation, désactivation, etc.)
         """
-        serializer = UserManagementSerializer(data=request.data, context={'request': request})
+        data = request.data
+        print(data)
+        serializer = UserManagementSerializer(data=data, context={'request': request})
         serializer.is_valid(raise_exception=True)
         user = serializer.save()
         
-        from users.serializers import UserProfileSerializer
         return Response(UserProfileSerializer(user).data)
 
 class ProjectManagementViewSet(viewsets.ViewSet):
@@ -360,7 +362,7 @@ class ProjectManagementViewSet(viewsets.ViewSet):
         """
         from projects.models import Project
         from projects.serializers import ProjectListSerializer
-        
+
         # Filtres
         status = request.query_params.get('status')
         featured = request.query_params.get('featured')
