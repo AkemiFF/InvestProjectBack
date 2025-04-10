@@ -6,6 +6,7 @@ from .views import ProjectViewSet, SectorViewSet
 
 router = DefaultRouter()
 router.register(r'', ProjectViewSet)
+# router.register(r'sectors', SectorViewSet)
 
 
 urlpatterns = [
