@@ -99,6 +99,11 @@ class WalletTransaction(models.Model):
     wallet = models.ForeignKey(Wallet, on_delete=models.CASCADE, related_name='transactions')
     transaction_type = models.CharField(max_length=20, choices=TRANSACTION_TYPE_CHOICES)
     amount = MoneyField(max_digits=12, decimal_places=2, default_currency='EUR')
+    status = models.CharField(max_length=20, default='pending', choices=[
+        ('pending', 'En attente'),
+        ('completed', 'Terminé'),
+        ('failed', 'Échoué'),
+    ])
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
