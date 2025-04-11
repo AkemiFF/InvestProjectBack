@@ -1,5 +1,7 @@
 # projects/views.py
 import json
+import os
+from django.http import FileResponse
 
 from django.db.models import F
 from django_filters.rest_framework import DjangoFilterBackend
@@ -180,7 +182,8 @@ class ProjectViewSet(viewsets.ModelViewSet):
             serializer.save(project=project)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
+
+
     @action(detail=True, methods=['delete'])
     def remove_media(self, request, pk=None):
         project = self.get_object()

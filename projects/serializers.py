@@ -3,7 +3,7 @@ from rest_framework import serializers
 from users.models import Favorite
 from users.serializers import UserProfileSerializer
 
-from .models import Project, ProjectMedia, Sector, TeamMember
+from .models import Project, ProjectMedia, Sector, TeamMember, ProjectUpdate
 
 
 class SectorSerializer(serializers.ModelSerializer):
@@ -53,12 +53,18 @@ class ProjectListSerializer(serializers.ModelSerializer):
         
         delta = obj.deadline - timezone.now().date()
         return max(0, delta.days)
+    
+class ProjectUpdateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ProjectUpdate
+        fields = ['id', 'date', 'title', 'content']
 
 class ProjectDetailSerializer(serializers.ModelSerializer):
     sector = SectorSerializer(read_only=True)
     owner = UserProfileSerializer(read_only=True)
     media = ProjectMediaSerializer(many=True, read_only=True)
     team_members = ProjectTeamMemberSerializer(many=True, read_only=True)
+    update_project = ProjectUpdateSerializer(many=True, read_only=True)
     progress = serializers.SerializerMethodField()
     days_left = serializers.SerializerMethodField()
     is_favorite = serializers.SerializerMethodField()
@@ -71,7 +77,7 @@ class ProjectDetailSerializer(serializers.ModelSerializer):
             'status', 'created_at', 'updated_at', 'deadline', 'is_featured','risks','use_of_funds',
             'is_boosted', 'views_count', 'interests_count', 'participants_count', 'location','return_timeline',
             'video_url', 'media', 'progress', 'days_left', 'is_favorite','financial_projections','competitive_advantage',
-            'equity', 'expected_return',
+            'equity', 'expected_return','update_project',
         ]
     
     def get_progress(self, obj):
