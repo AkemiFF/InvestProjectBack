@@ -13,6 +13,10 @@ from .serializers import (DepositSerializer, WalletSerializer,
                           WalletTransactionSerializer)
 
 stripe.api_key = settings.STRIPE_SECRET_KEY
+from decimal import Decimal
+
+from djmoney.money import Money
+
 
 class WalletViewSet(viewsets.ReadOnlyModelViewSet):
     """
@@ -38,7 +42,8 @@ class WalletViewSet(viewsets.ReadOnlyModelViewSet):
             return Response(serializer.data)
         except Wallet.DoesNotExist:
             # Créer un portefeuille si l'utilisateur n'en a pas
-            wallet = Wallet.objects.create(user=request.user)
+            
+            wallet = Wallet.objects.create(user=request.user, balance=Money(0, 'EUR'))
             serializer = self.get_serializer(wallet)
             return Response(serializer.data)
     
@@ -132,7 +137,8 @@ class WalletViewSet(viewsets.ReadOnlyModelViewSet):
                     
                     # Mettre à jour le portefeuille
                     wallet = Wallet.objects.get(user=request.user)
-                    wallet.deposit(trans.amount)
+                    amount = Money(trans.amount, 'EUR')
+                    wallet.deposit(amount)
                     
                     # Créer une transaction de portefeuille
                     WalletTransaction.objects.create(

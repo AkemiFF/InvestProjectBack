@@ -1,12 +1,21 @@
-from rest_framework import serializers
-from .models import Wallet, WalletTransaction
 from investments.models import Transaction
+from rest_framework import serializers
+
+from .models import Wallet, WalletTransaction
+
 
 class WalletSerializer(serializers.ModelSerializer):
     class Meta:
         model = Wallet
         fields = ['id', 'balance', 'updated_at']
         read_only_fields = ['id', 'balance', 'updated_at']
+        
+    def get_balance(self, obj):
+        # Retourne un dictionnaire avec amount et currency
+        return {
+            'amount': str(obj.balance.amount),
+            'currency': str(obj.balance.currency)
+        }
 
 class WalletTransactionSerializer(serializers.ModelSerializer):
     class Meta:
