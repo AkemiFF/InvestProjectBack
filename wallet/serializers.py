@@ -5,6 +5,8 @@ from .models import Wallet, WalletTransaction
 
 
 class WalletSerializer(serializers.ModelSerializer):
+    balance = serializers.SerializerMethodField()
+
     class Meta:
         model = Wallet
         fields = ['id', 'balance', 'updated_at']
@@ -20,7 +22,7 @@ class WalletSerializer(serializers.ModelSerializer):
 class WalletTransactionSerializer(serializers.ModelSerializer):
     class Meta:
         model = WalletTransaction
-        fields = ['id', 'transaction_type', 'amount', 'created_at']
+        fields = ['id', 'transaction_type', 'amount', 'created_at',"status"]
         read_only_fields = ['id', 'transaction_type', 'amount', 'created_at']
 
 class DepositSerializer(serializers.ModelSerializer):

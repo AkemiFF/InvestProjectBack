@@ -264,7 +264,7 @@ class WalletViewSet(viewsets.ReadOnlyModelViewSet):
                 from_currency=wallet.balance.currency.code, 
                 to_currency=currency
             )
-            
+            print(new_balance)
             # Mettre à jour le portefeuille
             wallet.balance.currency = currency
             wallet.balance.amount = new_balance
