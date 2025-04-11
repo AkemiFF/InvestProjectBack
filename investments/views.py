@@ -1,21 +1,20 @@
 # investments/views.py
-from rest_framework import viewsets, permissions, status, filters
+from django.db import transaction
+from django.db.models import Count, F, Q, Sum
+from django_filters.rest_framework import DjangoFilterBackend
+from notifications.utils import create_system_notification
+from rest_framework import filters, permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from django.db.models import Sum, Count, F, Q
-from django.db import transaction
-from django_filters.rest_framework import DjangoFilterBackend
+
 from .models import Investment, Transaction
-from .serializers import (
-    InvestmentSerializer, InvestmentCreateSerializer,
-    TransactionSerializer, DepositSerializer, WithdrawalSerializer
-)
 from .permissions import IsInvestmentParticipant, IsTransactionOwner
-from .utils import (
-    calculate_user_balance, update_project_amount_raised,
-    update_user_investment_stats, update_project_owner_stats
-)
-from notifications.utils import create_system_notification
+from .serializers import (DepositSerializer, InvestmentCreateSerializer,
+                          InvestmentSerializer, TransactionSerializer,
+                          WithdrawalSerializer)
+from .utils import (calculate_user_balance, update_project_amount_raised,
+                    update_project_owner_stats, update_user_investment_stats)
+
 
 class InvestmentViewSet(viewsets.ModelViewSet):
     """
