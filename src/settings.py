@@ -41,6 +41,7 @@ INSTALLED_APPS = [
     'debug_toolbar',
     'storages',
 
+    'wallet',
     'projects',
     'comments',
     'messaging',
