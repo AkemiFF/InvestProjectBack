@@ -1,9 +1,14 @@
 # investments/serializers.py
-from rest_framework import serializers
-from .models import Investment, Transaction
-from projects.serializers import ProjectListSerializer
-from users.serializers import UserProfileSerializer
+from decimal import Decimal
+
 from django.db import transaction as db_transaction
+from projects.models import Project
+from projects.serializers import ProjectListSerializer
+from rest_framework import serializers
+from users.serializers import UserProfileSerializer
+
+from .models import Investment, Transaction
+
 
 class TransactionSerializer(serializers.ModelSerializer):
     """
@@ -26,19 +31,19 @@ class InvestmentSerializer(serializers.ModelSerializer):
     """
     Sérialiseur pour les investissements
     """
-    investor = UserProfileSerializer(read_only=True)
+    user = UserProfileSerializer(read_only=True)
     project = ProjectListSerializer(read_only=True)
     transactions = TransactionSerializer(many=True, read_only=True)
     
     class Meta:
         model = Investment
         fields = [
-            'id', 'investor', 'project', 'amount', 'commission_amount',
+            'id', 'user', 'project', 'amount', 'commission_amount',
             'status', 'transaction_id', 'created_at', 'completed_at',
-            'notes', 'transactions'
+            'transactions'
         ]
         read_only_fields = [
-            'id', 'investor', 'commission_amount', 'status', 'transaction_id',
+            'id', 'user', 'commission_amount', 'status', 'transaction_id',
             'created_at', 'completed_at', 'transactions'
         ]
 
@@ -47,10 +52,10 @@ class InvestmentCreateSerializer(serializers.ModelSerializer):
     Sérialiseur pour la création d'investissements
     """
     project_id = serializers.IntegerField(write_only=True)
-    
+    project = ProjectListSerializer(read_only=True)
     class Meta:
         model = Investment
-        fields = ['project_id', 'amount', 'notes']
+        fields = ['project_id','project', 'amount', "payment_method",'payment_intent_id',"created_at"]
     
     def validate_amount(self, value):
         """
@@ -60,7 +65,7 @@ class InvestmentCreateSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Le montant doit être positif.")
         
         project_id = self.initial_data.get('project_id')
-        from projects.models import Project
+       
         
         try:
             project = Project.objects.get(id=project_id)
@@ -101,24 +106,25 @@ class InvestmentCreateSerializer(serializers.ModelSerializer):
         """
         Crée un nouvel investissement et les transactions associées
         """
-        from projects.models import Project
         from notifications.utils import create_investment_notification
+        from projects.models import Project
         
         project_id = validated_data.pop('project_id')
         project = Project.objects.get(id=project_id)
         investor = self.context['request'].user
-        amount = validated_data.get('amount')
+        amount = validated_data.pop('amount', None)
         
         # Calculer la commission (10% selon le cahier des charges)
         commission_rate = 0.10
-        commission_amount = amount * commission_rate
+
+        commission_amount = amount * Decimal(str(commission_rate))
         
         # Créer l'investissement
         investment = Investment.objects.create(
-            investor=investor,
+            user=investor,
             project=project,
             amount=amount,
-            commission_amount=commission_amount,
+            # commission_amount=commission_amount,
             status='pending',
             **validated_data
         )
