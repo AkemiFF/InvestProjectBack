@@ -102,6 +102,19 @@ class TeamMember(models.Model):
         def __str__(self):
             return f"{self.name} - {self.role}"
 
+class ProjectUpdate(models.Model):
+    project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='update_project')
+    date = models.DateField()
+    title = models.CharField(max_length=255)
+    content = models.TextField()
+
+    class Meta:
+        ordering = ['-date']
+
+    def __str__(self):
+        return f"{self.date} - {self.title}"
+
+
 
 class ProjectMedia(models.Model):
     """
