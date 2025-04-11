@@ -1,15 +1,16 @@
 # projects/views.py
-from rest_framework import viewsets, permissions, status, filters
-from rest_framework.decorators import action
-from rest_framework.response import Response
+import json
+
 from django.db.models import F
 from django_filters.rest_framework import DjangoFilterBackend
-from .models import Project, ProjectMedia, Sector
-from .serializers import (
-    ProjectListSerializer, ProjectDetailSerializer, ProjectCreateUpdateSerializer,
-    ProjectMediaSerializer, ProjectMediaCreateSerializer, SectorSerializer
-)
+from rest_framework import filters, permissions, status, viewsets
+from rest_framework.decorators import action
+from rest_framework.response import Response
+
 from .filters import ProjectFilter
+from .models import Project, ProjectMedia, Sector
+from .serializers import *
+
 
 class IsOwnerOrReadOnly(permissions.BasePermission):
     """
@@ -40,11 +41,76 @@ class ProjectViewSet(viewsets.ModelViewSet):
     ordering_fields = ['created_at', 'amount_raised', 'deadline', 'participants_count']
     ordering = ['-created_at']
     
+    def create(self, request, *args, **kwargs):
+        data = request.data
+        data['owner'] = request.user.id  # Assigner l'utilisateur connecté comme propriétaire
+        print(data)
+        # Sérialisation et validation des données du projet
+        serializer = self.get_serializer(data=data)
+        if not serializer.is_valid():
+            print("Erreurs de validation :", serializer.errors)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+        # Création du projet principal
+        project = serializer.save()
+
+        # Gestion des fichiers (images et documents)
+        cover_image = request.FILES.get('cover_image')
+        if cover_image:
+            ProjectMedia.objects.create(
+                project=project,
+                file=cover_image,
+                file_type='image', 
+                cover=True  
+            )
+        # Gestion des membres de l'équipe
+        teams = data.get('team', [])
+        try:
+            teams = json.loads(data.get('team', '[]'))
+        except json.JSONDecodeError:
+            return Response(
+                {"detail": "Le format de l'équipe est invalide."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        print(teams)
+        for team in teams:
+            print(team)
+            TeamMember.objects.create(
+            project=project,
+            name=team.get('name'),
+            role=team.get('role'),
+            photo=team.get('photo'),
+            facebook_url=team.get('facebook_url')
+            )
+            
+        images = request.FILES.getlist('images')
+        for image in images:
+            ProjectMedia.objects.create(
+                project=project,
+                file=image,
+                file_type='image'
+            )
+
+        documents = request.FILES.getlist('documents')
+        for document in documents:
+            ProjectMedia.objects.create(
+                project=project,
+                file=document,
+                title=document.name,
+                file_type='doc'
+            )
+
+        # Retourner la réponse avec les données du projet créé
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return super().create(request, *args, **kwargs)
+    
     def get_serializer_class(self):
         if self.action == 'list':
             return ProjectListSerializer
-        elif self.action in ['create', 'update', 'partial_update']:
+        elif self.action in [ 'update', 'partial_update']:
             return ProjectCreateUpdateSerializer
+        elif self.action in ['create']:
+            return ProjectCreateSerializer
         return ProjectDetailSerializer
     
     def get_queryset(self):
@@ -62,16 +128,19 @@ class ProjectViewSet(viewsets.ModelViewSet):
         # Filtrer par projets qui se terminent bientôt
         ending_soon = self.request.query_params.get('ending_soon')
         if ending_soon and ending_soon.lower() == 'true':
-            from django.utils import timezone
             import datetime
+
+            from django.utils import timezone
             seven_days_later = timezone.now().date() + datetime.timedelta(days=7)
             queryset = queryset.filter(deadline__lte=seven_days_later, deadline__gte=timezone.now().date())
         
         # Filtrer par nouveaux projets
         new = self.request.query_params.get('new')
         if new and new.lower() == 'true':
-            from django.utils import timezone
             import datetime
+
+            from django.utils import timezone
+
             thirty_days_ago = timezone.now().date() - datetime.timedelta(days=30)
             queryset = queryset.filter(created_at__gte=thirty_days_ago)
         
@@ -197,3 +266,64 @@ class ProjectViewSet(viewsets.ModelViewSet):
         project.save(update_fields=['status'])
         
         return Response({"status": "Le projet a été soumis pour validation."})
+
+    @action(detail=True, methods=['post'])
+    def add_team_member(self, request, pk=None):
+        """
+        Ajouter un membre à l'équipe du projet
+        """
+        project = self.get_object()
+            
+        # Vérifier que l'utilisateur est le propriétaire du projet
+        if project.owner != request.user:
+            return Response(
+                {"detail": "Vous n'êtes pas autorisé à ajouter des membres à l'équipe de ce projet."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+            
+        serializer = ProjectTeamMemberSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save(project=project)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=True, methods=['delete'])
+    def remove_team_member(self, request, pk=None):
+        """
+        Supprimer un membre de l'équipe du projet
+        """
+        project = self.get_object()
+        
+        # Vérifier que l'utilisateur est le propriétaire du projet
+        if project.owner != request.user:
+            return Response(
+                {"detail": "Vous n'êtes pas autorisé à supprimer des membres de l'équipe de ce projet."},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        member_id = request.data.get('member_id')
+        if not member_id:
+            return Response(
+                {"detail": "L'ID du membre est requis."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        try:
+            team_member = project.team_members.get(id=member_id)
+            team_member.delete()
+            return Response({"detail": "Membre supprimé avec succès."}, status=status.HTTP_204_NO_CONTENT)
+        except TeamMember.DoesNotExist:
+            return Response(
+                {"detail": "Membre non trouvé."},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+    @action(detail=True, methods=['get'])
+    def list_team_members(self, request, pk=None):
+        """
+        Lister les membres de l'équipe du projet
+        """
+        project = self.get_object()
+        team_members = project.team_members.all()
+        serializer = ProjectTeamMemberSerializer(team_members, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)

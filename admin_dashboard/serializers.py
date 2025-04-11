@@ -1,9 +1,11 @@
 # admin_dashboard/serializers.py
-from rest_framework import serializers
-from .models import AdminLog, SystemSetting, Statistic
-from users.serializers import UserProfileSerializer
 from django.db import transaction
 from django.utils import timezone
+from rest_framework import serializers
+from users.serializers import UserProfileSerializer
+
+from .models import AdminLog, Statistic, SystemSetting
+
 
 class AdminLogSerializer(serializers.ModelSerializer):
     """
@@ -83,11 +85,13 @@ class UserManagementSerializer(serializers.Serializer):
         Exécute l'action sur l'utilisateur
         """
         from users.models import User
+
         from .utils import log_admin_action
         
         user_id = self.validated_data.get('user_id')
         action = self.validated_data.get('action')
         reason = self.validated_data.get('reason', '')
+        user_type = self.validated_data.get('user_type', '')
         
         user = User.objects.get(id=user_id)
         admin_user = self.context['request'].user
@@ -110,6 +114,11 @@ class UserManagementSerializer(serializers.Serializer):
         elif action == 'make_admin':
             user.is_staff = True
             user.save(update_fields=['is_staff'])
+            description = f"Attribution des droits d'administrateur à {user.username}"
+        
+        elif action == 'update_role':
+            user.is_staff = True
+            user.save(user_type=user_type)
             description = f"Attribution des droits d'administrateur à {user.username}"
         
         elif action == 'remove_admin':
@@ -138,7 +147,7 @@ class ProjectManagementSerializer(serializers.Serializer):
     """
     project_id = serializers.IntegerField(required=True)
     action = serializers.ChoiceField(
-        choices=['approve', 'reject', 'feature', 'unfeature', 'hide', 'unhide'],
+        choices=['active', 'reject', 'feature', 'unfeature', 'hide', 'unhide'],
         required=True
     )
     reason = serializers.CharField(required=False, allow_blank=True)
@@ -160,8 +169,9 @@ class ProjectManagementSerializer(serializers.Serializer):
         """
         Exécute l'action sur le projet
         """
-        from projects.models import Project
         from notifications.utils import create_system_notification
+        from projects.models import Project
+
         from .utils import log_admin_action
         
         project_id = self.validated_data.get('project_id')
@@ -171,8 +181,8 @@ class ProjectManagementSerializer(serializers.Serializer):
         project = Project.objects.get(id=project_id)
         admin_user = self.context['request'].user
         
-        if action == 'approve':
-            project.status = 'approved'
+        if action == 'active':
+            project.status = 'active'
             project.save(update_fields=['status'])
             description = f"Approbation du projet '{project.title}'"
             
@@ -180,7 +190,8 @@ class ProjectManagementSerializer(serializers.Serializer):
             create_system_notification(
                 recipient=project.owner,
                 title="Projet approuvé",
-                message=f"Votre projet '{project.title}' a été approuvé et est maintenant visible sur la plateforme."
+                message=f"Votre projet '{project.title}' a été approuvé et est maintenant visible sur la plateforme.",
+                related_object=project 
             )
         
         elif action == 'reject':
@@ -192,7 +203,8 @@ class ProjectManagementSerializer(serializers.Serializer):
             create_system_notification(
                 recipient=project.owner,
                 title="Projet rejeté",
-                message=f"Votre projet '{project.title}' a été rejeté. Raison: {reason or 'Non spécifiée'}"
+                message=f"Votre projet '{project.title}' a été rejeté. Raison: {reason or 'Non spécifiée'}",
+                related_object=project 
             )
         
         elif action == 'feature':
@@ -204,7 +216,8 @@ class ProjectManagementSerializer(serializers.Serializer):
             create_system_notification(
                 recipient=project.owner,
                 title="Projet mis en avant",
-                message=f"Votre projet '{project.title}' a été mis en avant sur la plateforme."
+                message=f"Votre projet '{project.title}' a été mis en avant sur la plateforme.",
+                related_object=project 
             )
         
         elif action == 'unfeature':
@@ -221,7 +234,8 @@ class ProjectManagementSerializer(serializers.Serializer):
             create_system_notification(
                 recipient=project.owner,
                 title="Projet masqué",
-                message=f"Votre projet '{project.title}' a été masqué. Raison: {reason or 'Non spécifiée'}"
+                message=f"Votre projet '{project.title}' a été masqué. Raison: {reason or 'Non spécifiée'}",
+                related_object=project 
             )
         
         elif action == 'unhide':
@@ -233,7 +247,8 @@ class ProjectManagementSerializer(serializers.Serializer):
             create_system_notification(
                 recipient=project.owner,
                 title="Projet visible",
-                message=f"Votre projet '{project.title}' est à nouveau visible sur la plateforme."
+                message=f"Votre projet '{project.title}' est à nouveau visible sur la plateforme.",
+                related_object=project 
             )
         
         # Ajouter la raison si elle est fournie
@@ -281,6 +296,7 @@ class CommentModerationSerializer(serializers.Serializer):
         """
         from comments.models import Comment
         from notifications.utils import create_system_notification
+
         from .utils import log_admin_action
         
         comment_id = self.validated_data.get('comment_id')

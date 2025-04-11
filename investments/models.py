@@ -1,30 +1,56 @@
-from django.db import models
-from users.models import User
+
+from django.contrib.auth.models import User
+from django.core.exceptions import ValidationError
+from django.db import models, transaction
+from djmoney.models.fields import MoneyField
 from projects.models import Project
+from users.models import User
+
 
 class Investment(models.Model):
-    """
-    Investissements dans les projets
-    """
     STATUS_CHOICES = (
         ('pending', 'En attente'),
         ('completed', 'Complété'),
-        ('cancelled', 'Annulé'),
+        ('failed', 'Échoué'),
         ('refunded', 'Remboursé'),
     )
     
-    investor = models.ForeignKey(User, on_delete=models.CASCADE, related_name='investments')
+    PAYMENT_METHOD_CHOICES = (
+        ('wallet', 'Portefeuille'),
+        ('card', 'Carte'),
+        ('bank', 'Virement bancaire'),
+    )
+    
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='investments')
     project = models.ForeignKey(Project, on_delete=models.CASCADE, related_name='investments')
-    amount = models.DecimalField(max_digits=15, decimal_places=2)
-    commission_amount = models.DecimalField(max_digits=15, decimal_places=2)
+    amount = models.DecimalField(max_digits=12, decimal_places=2)
+    commission_amount = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True)
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
-    transaction_id = models.CharField(max_length=100, blank=True)
+    payment_method = models.CharField(max_length=20, choices=PAYMENT_METHOD_CHOICES)
+    payment_intent_id = models.CharField(max_length=255, blank=True, null=True)
+    payment_session_id = models.CharField(max_length=255, blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
     completed_at = models.DateTimeField(null=True, blank=True)
-    notes = models.TextField(blank=True)
+    transaction = models.OneToOneField('Transaction', on_delete=models.SET_NULL, null=True, blank=True, related_name='investment_transaction')
+    class Meta:
+        ordering = ['-created_at']
     
     def __str__(self):
-        return f"Investissement de {self.investor.username} dans {self.project.title}"
+        return f"{self.user.username} - {self.project.title} - {self.amount}"
+    
+    def save(self, *args, **kwargs):
+        # Si le statut passe à 'completed', mettre à jour le montant collecté du projet
+        if self.status == 'completed' and not self.completed_at:
+            from django.utils import timezone
+            self.completed_at = timezone.now()
+            
+            # Mettre à jour le montant collecté du projet
+            self.project.amount_raised += self.amount
+            self.project.save()
+        
+        super().save(*args, **kwargs)
+
 
 class Transaction(models.Model):
     """

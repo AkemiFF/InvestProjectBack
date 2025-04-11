@@ -1,21 +1,20 @@
 # investments/views.py
-from rest_framework import viewsets, permissions, status, filters
+from django.db import transaction
+from django.db.models import Count, F, Q, Sum
+from django_filters.rest_framework import DjangoFilterBackend
+from notifications.utils import create_system_notification
+from rest_framework import filters, permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from django.db.models import Sum, Count, F, Q
-from django.db import transaction
-from django_filters.rest_framework import DjangoFilterBackend
+
 from .models import Investment, Transaction
-from .serializers import (
-    InvestmentSerializer, InvestmentCreateSerializer,
-    TransactionSerializer, DepositSerializer, WithdrawalSerializer
-)
 from .permissions import IsInvestmentParticipant, IsTransactionOwner
-from .utils import (
-    calculate_user_balance, update_project_amount_raised,
-    update_user_investment_stats, update_project_owner_stats
-)
-from notifications.utils import create_system_notification
+from .serializers import (DepositSerializer, InvestmentCreateSerializer,
+                          InvestmentSerializer, TransactionSerializer,
+                          WithdrawalSerializer)
+from .utils import (calculate_user_balance, update_project_amount_raised,
+                    update_project_owner_stats, update_user_investment_stats)
+
 
 class InvestmentViewSet(viewsets.ModelViewSet):
     """
@@ -27,7 +26,7 @@ class InvestmentViewSet(viewsets.ModelViewSet):
     filterset_fields = ['status', 'project']
     ordering_fields = ['created_at', 'amount']
     ordering = ['-created_at']
-    
+
     def get_queryset(self):
         """
         Retourne les investissements de l'utilisateur ou des projets de l'utilisateur
@@ -56,7 +55,7 @@ class InvestmentViewSet(viewsets.ModelViewSet):
         """
         Récupère les investissements de l'utilisateur connecté
         """
-        queryset = Investment.objects.filter(investor=request.user)
+        queryset = Investment.objects.filter(user=request.user)
         
         # Filtrer par statut si spécifié
         status_param = request.query_params.get('status')
@@ -116,7 +115,7 @@ class InvestmentViewSet(viewsets.ModelViewSet):
             )
         
         # Vérifier que l'utilisateur est l'investisseur
-        if investment.investor != request.user:
+        if investment.user != request.user:
             return Response(
                 {"detail": "Vous ne pouvez annuler que vos propres investissements."},
                 status=status.HTTP_403_FORBIDDEN
@@ -134,7 +133,7 @@ class InvestmentViewSet(viewsets.ModelViewSet):
             create_system_notification(
                 recipient=investment.project.owner,
                 title="Investissement annulé",
-                message=f"L'investissement de {investment.investor.first_name} {investment.investor.last_name} de {investment.amount} dans votre projet '{investment.project.title}' a été annulé."
+                message=f"L'investissement de {investment.user.first_name} {investment.user.last_name} de {investment.amount} dans votre projet '{investment.project.title}' a été annulé."
             )
         
         return Response({"status": "Investissement annulé avec succès."})
@@ -172,14 +171,14 @@ class InvestmentViewSet(viewsets.ModelViewSet):
             update_project_amount_raised(investment.project)
             
             # Mettre à jour les statistiques de l'investisseur
-            update_user_investment_stats(investment.investor)
+            update_user_investment_stats(investment.user)
             
             # Mettre à jour les statistiques du porteur de projet
             update_project_owner_stats(investment.project.owner)
             
             # Créer des notifications
             create_system_notification(
-                recipient=investment.investor,
+                recipient=investment.user,
                 title="Investissement confirmé",
                 message=f"Votre investissement de {investment.amount} dans le projet '{investment.project.title}' a été confirmé."
             )
@@ -187,7 +186,7 @@ class InvestmentViewSet(viewsets.ModelViewSet):
             create_system_notification(
                 recipient=investment.project.owner,
                 title="Investissement confirmé",
-                message=f"L'investissement de {investment.investor.first_name} {investment.investor.last_name} de {investment.amount} dans votre projet '{investment.project.title}' a été confirmé."
+                message=f"L'investissement de {investment.user.first_name} {investment.user.last_name} de {investment.amount} dans votre projet '{investment.project.title}' a été confirmé."
             )
         
         return Response({"status": "Investissement confirmé avec succès."})
