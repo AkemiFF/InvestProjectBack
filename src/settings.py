@@ -40,6 +40,7 @@ INSTALLED_APPS = [
     'django_celery_results',
     'debug_toolbar',
     'storages',
+    'djmoney',
 
     'wallet',
     'projects',
@@ -54,6 +55,9 @@ INSTALLED_APPS = [
     # Ton app d'authentification
     
 ]
+
+CURRENCIES = ('EUR', 'USD', 'MGA')
+CURRENCY_CHOICES = [('EUR', 'Euro'), ('USD', 'Dollar US'), ('MGA', 'Ariary Malgache')]
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
