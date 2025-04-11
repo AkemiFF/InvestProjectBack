@@ -9,15 +9,18 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 
 from .models import Wallet, WalletTransaction
-from .serializers import (DepositSerializer, WalletSerializer,
-                          WalletTransactionSerializer)
+from .serializers import *
 
 stripe.api_key = settings.STRIPE_SECRET_KEY
 from decimal import Decimal
 
 from djmoney.money import Money
 
-
+WITHDRAWAL_LIMITS = {
+    'EUR': 5000,
+    'USD': 5500,
+    'MGA': 24000000
+}
 class WalletViewSet(viewsets.ReadOnlyModelViewSet):
     """
     API endpoint pour les portefeuilles
@@ -152,6 +155,136 @@ class WalletViewSet(viewsets.ReadOnlyModelViewSet):
                     return Response({"detail": "Transaction non trouvée."}, status=status.HTTP_404_NOT_FOUND)
         except Exception as e:
             return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=False, methods=['post'])
+    def create_withdrawal(self, request):
+        """
+        Crée une demande de retrait
+        """
+        try:
+            serializer = WithdrawalSerializer(data=request.data)
+            if not serializer.is_valid():
+                return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            
+            amount = serializer.validated_data.get('amount')
+            currency = serializer.validated_data.get('currency', 'EUR')
+            
+            # Vérifier la limite de retrait
+            limit = WITHDRAWAL_LIMITS.get(currency, WITHDRAWAL_LIMITS['EUR'])
+            if amount > limit:
+                return Response({
+                    "detail": f"Le montant dépasse la limite de retrait ({limit} {currency})."
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Récupérer le portefeuille
+            try:
+                wallet = Wallet.objects.get(user=request.user)
+            except Wallet.DoesNotExist:
+                return Response({"detail": "Portefeuille non trouvé."}, status=status.HTTP_404_NOT_FOUND)
+            
+            # Vérifier le solde
+            if wallet.balance.amount < amount:
+                return Response({"detail": "Solde insuffisant."}, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Créer un transfert Stripe (dans un système réel, vous utiliseriez Stripe Connect)
+            # Pour cet exemple, nous simulons simplement le transfert
+            transfer = {
+                'id': f'tr_{timezone.now().timestamp()}',
+                'amount': int(amount * 100),
+                'currency': currency.lower(),
+                'status': 'pending'
+            }
+            
+            # Créer une transaction
+            with transaction.atomic():
+                trans = Transaction.objects.create(
+                    user=request.user,
+                    transaction_type='withdrawal',
+                    amount=amount,
+                    status='pending',
+                    reference_id=transfer['id']
+                )
+                
+                # Dans un système réel, vous ne déduiriez pas immédiatement le montant
+                # Mais pour cet exemple, nous le faisons
+                money_amount = Money(amount, currency)
+                wallet.withdraw(money_amount)
+                
+                # Créer une transaction de portefeuille
+                WalletTransaction.objects.create(
+                    wallet=wallet,
+                    transaction_type='withdraw',
+                    amount=amount
+                )
+                
+                return Response({
+                    "status": "Demande de retrait créée avec succès.",
+                    "transaction_id": trans.id,
+                    "amount": amount,
+                    "currency": currency,
+                    "estimated_arrival": (timezone.now() + timezone.timedelta(days=3)).strftime('%Y-%m-%d')
+                })
+                
+        except Exception as e:
+            return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=False, methods=['post'])
+    def change_currency(self, request):
+        """
+        Change la devise du portefeuille
+        """
+        try:
+            serializer = CurrencySerializer(data=request.data)
+            if not serializer.is_valid():
+                return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            
+            currency = serializer.validated_data.get('currency')
+            
+            # Vérifier que la devise est prise en charge
+            supported_currencies = ['EUR', 'USD', 'MGA']
+            if currency not in supported_currencies:
+                return Response({
+                    "detail": f"Devise non prise en charge. Les devises disponibles sont: {', '.join(supported_currencies)}"
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Récupérer le portefeuille
+            try:
+                wallet = Wallet.objects.get(user=request.user)
+            except Wallet.DoesNotExist:
+                return Response({"detail": "Portefeuille non trouvé."}, status=status.HTTP_404_NOT_FOUND)
+            
+            # Si la devise est déjà celle du portefeuille, ne rien faire
+            if wallet.balance.currency.code == currency:
+                return Response({"status": f"La devise est déjà en {currency}."})
+            
+            # Convertir le solde dans la nouvelle devise
+            from .models import convert_currency
+            new_balance = convert_currency(
+                wallet.balance.amount, 
+                from_currency=wallet.balance.currency.code, 
+                to_currency=currency
+            )
+            
+            # Mettre à jour le portefeuille
+            wallet.balance.currency = currency
+            wallet.balance.amount = new_balance
+            wallet.save()
+            
+            return Response({
+                "status": f"Devise changée avec succès en {currency}.",
+                "new_balance": str(new_balance),
+                "currency": currency
+            })
+                
+        except Exception as e:
+            return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=False, methods=['get'])
+    def withdrawal_limits(self, request):
+        """
+        Récupère les limites de retrait
+        """
+        return Response(WITHDRAWAL_LIMITS)
 
     @action(detail=False, methods=['post'])
     def stripe_webhook(self, request):

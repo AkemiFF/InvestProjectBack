@@ -34,3 +34,13 @@ class DepositSerializer(serializers.ModelSerializer):
         validated_data['user'] = user
         validated_data['transaction_type'] = 'deposit'
         return Transaction.objects.create(**validated_data)
+
+class WithdrawalSerializer(serializers.Serializer):
+    amount = serializers.DecimalField(max_digits=12, decimal_places=2, min_value=0.01)
+    currency = serializers.CharField(max_length=3, required=False, default='EUR')
+    account_number = serializers.CharField(max_length=50, required=False)
+    bank_code = serializers.CharField(max_length=20, required=False)
+    account_name = serializers.CharField(max_length=100, required=False)
+
+class CurrencySerializer(serializers.Serializer):
+    currency = serializers.CharField(max_length=3)

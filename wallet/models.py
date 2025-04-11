@@ -4,6 +4,7 @@ from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.db import models, transaction
 from djmoney.models.fields import MoneyField
+from djmoney.money import Money
 from investments.models import Investment, Transaction
 from users.models import User
 
@@ -43,6 +44,8 @@ class Wallet(models.Model):
 
     def deposit(self, amount):
         """Ajouter des fonds au portefeuille"""
+        if isinstance(amount, (int, float, Decimal)):
+            amount = Money(amount, self.balance.currency)
         self.balance += amount
         self.save()
 
@@ -66,7 +69,7 @@ class Wallet(models.Model):
             raise ValueError("Fonds insuffisants dans le portefeuille.")
         
     def withdraw(self, amount, currency=None):
-        if amount <= 0:
+        if amount.amount <= 0:
             raise ValidationError("Le montant doit être positif.")
         
         # Si une devise différente est passée, ou en cas de logique de conversion, la gérer ici
@@ -76,12 +79,12 @@ class Wallet(models.Model):
         
         with transaction.atomic():
             wallet = Wallet.objects.select_for_update().get(pk=self.pk)
-            if wallet.balance.amount < amount:
+            if wallet.balance.amount < amount.amount:
                 raise ValidationError("Solde insuffisant.")
             wallet.balance -= amount
             wallet.save()
             # Enregistrer la transaction
-            Transaction.objects.create(wallet=wallet, transaction_type='WITHDRAWAL', amount=amount)
+            WalletTransaction.objects.create(wallet=wallet, transaction_type='withdraw', amount=amount)
             return True
         return False
 
@@ -95,7 +98,7 @@ class WalletTransaction(models.Model):
 
     wallet = models.ForeignKey(Wallet, on_delete=models.CASCADE, related_name='transactions')
     transaction_type = models.CharField(max_length=20, choices=TRANSACTION_TYPE_CHOICES)
-    amount = models.DecimalField(max_digits=12, decimal_places=2)
+    amount = MoneyField(max_digits=12, decimal_places=2, default_currency='EUR')
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
